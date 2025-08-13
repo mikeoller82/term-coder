@@ -1,0 +1,30 @@
+model:
+  default: gpt-5-mini
+  heavy: gpt-5
+  local: ollama/qwen3-coder
+retrieval:
+  max_files: 50
+  max_tokens: 8000
+  hybrid_weight: 0.7
+  chunk_size: 1000
+  chunk_overlap: 200
+safety:
+  require_confirmation: true
+  create_backups: true
+  max_file_size: 1048576
+privacy:
+  offline: false
+  redact_secrets: true
+  log_prompts: false
+git:
+  create_branch_on_edit: false
+  auto_stage_patches: true
+  commit_message_template: 'AI: {summary}'
+formatters:
+  python:
+  - black
+  - isort
+  javascript:
+  - prettier
+  go:
+  - gofmt
