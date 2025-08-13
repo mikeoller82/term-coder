@@ -414,8 +414,13 @@ class NaturalLanguageInterface:
             # If no quotes, clean the input by removing the command verb
             first_word = user_input.lower().split(' ')[0]
             command_verbs = [
+
                 'search', 'find', 'debug', 'fix', 'explain', 'edit',
                 'add', 'review', 'run', 'test', 'refactor', 'generate',
+
+                'search', 'find', 'debug', 'fix', 'explain', 'edit', 
+                'add', 'review', 'run', 'test', 'refactor', 'generate', 
+
                 'document', 'optimize'
             ]
             if first_word in command_verbs:
@@ -423,8 +428,13 @@ class NaturalLanguageInterface:
         
         # Only run hybrid search for intents that are likely to involve a file
         intents_for_file_search = [
+
             IntentType.EDIT, IntentType.FIX, IntentType.EXPLAIN, IntentType.DEBUG,
             IntentType.REFACTOR, IntentType.REVIEW, IntentType.TEST, IntentType.DOCUMENT,
+
+            IntentType.EDIT, IntentType.FIX, IntentType.EXPLAIN, IntentType.DEBUG, 
+            IntentType.REFACTOR, IntentType.REVIEW, IntentType.TEST, IntentType.DOCUMENT, 
+
             IntentType.OPTIMIZE, IntentType.GENERATE
         ]
         
@@ -440,7 +450,13 @@ class NaturalLanguageInterface:
         if not query:
             return None
 
+
         self.console.print(f"[dim]Searching for files related to: '{query}'...[/dim]")
+
+
+        
+        self.console.print(f"[dim]Searching for files related to: '{query}'...[/dim]")
+        
 
         try:
             results = self.search.search(query, top=1)
