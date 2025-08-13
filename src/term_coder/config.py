@@ -15,7 +15,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "model": {
         "default": "gpt-5-mini",
         "heavy": "gpt-5",
-        "local": "ollama/qwen3-coder"
+        "local": "ollama/gpt-oss"
     },
     "retrieval": {
         "max_files": 50,
