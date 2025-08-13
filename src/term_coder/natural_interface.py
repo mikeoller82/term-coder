@@ -319,7 +319,7 @@ class NaturalLanguageInterface:
             best_confidence = 0.4
         
         # Extract target and scope
-        target = self._extract_target(user_input)
+        target = self._extract_target(user_input, best_intent_type)
         scope = self._extract_scope(user_input)
         
         return Intent(
@@ -383,53 +383,75 @@ class NaturalLanguageInterface:
         
         return intent_scores
     
-    def _extract_target(self, user_input: str) -> Optional[str]:
+    def _extract_target(self, user_input: str, intent_type: IntentType) -> Optional[str]:
         """Extract target (file, function, etc.) from user input with enhanced file finding."""
-        # Look for full paths with file extensions (e.g., src/term_coder/llm.py)
+        # 1. Look for explicit file paths first.
         path_match = re.search(r'([a-zA-Z_][a-zA-Z0-9_/.-]*\.[a-zA-Z]+)', user_input)
         if path_match:
             potential_path = path_match.group(1)
-            # Try to find the actual file
+            if Path(potential_path).exists():
+                return potential_path
+            # It might be a partial path, let's try finding it
             found_file = self._find_file_in_codebase(potential_path)
             if found_file:
                 return found_file
-            return potential_path
-        
-        # Look for simple filenames with extensions
+
         file_match = re.search(r'(\w+\.\w+)', user_input)
         if file_match:
             filename = file_match.group(1)
-            # Try to find the actual file in the codebase
             found_file = self._find_file_in_codebase(filename)
             if found_file:
                 return found_file
-            return filename
         
-        # Look for quoted strings
+        # 2. If no explicit file path, use hybrid search on the natural language query.
+        search_query = user_input
+
+        # Prefer quoted content as the search query if it exists
         quoted_match = re.search(r'["\']([^"\']+)["\']', user_input)
         if quoted_match:
-            quoted_content = quoted_match.group(1)
-            # If it looks like a file, try to find it
-            if '.' in quoted_content or '/' in quoted_content:
-                found_file = self._find_file_in_codebase(quoted_content)
-                if found_file:
-                    return found_file
-            return quoted_content
+            search_query = quoted_match.group(1)
+        else:
+            # If no quotes, clean the input by removing the command verb
+            first_word = user_input.lower().split(' ')[0]
+            command_verbs = [
+                'search', 'find', 'debug', 'fix', 'explain', 'edit',
+                'add', 'review', 'run', 'test', 'refactor', 'generate',
+                'document', 'optimize'
+            ]
+            if first_word in command_verbs:
+                search_query = ' '.join(user_input.split(' ')[1:])
         
-        # Look for common file patterns without extensions
-        file_patterns = [
-            r'\b(main|index|app|server|client|config|utils|helpers?)\b',
-            r'\b([a-zA-Z_][a-zA-Z0-9_]*)\s+file\b',
-            r'\bfile\s+([a-zA-Z_][a-zA-Z0-9_]*)\b'
+        # Only run hybrid search for intents that are likely to involve a file
+        intents_for_file_search = [
+            IntentType.EDIT, IntentType.FIX, IntentType.EXPLAIN, IntentType.DEBUG,
+            IntentType.REFACTOR, IntentType.REVIEW, IntentType.TEST, IntentType.DOCUMENT,
+            IntentType.OPTIMIZE, IntentType.GENERATE
         ]
         
-        for pattern in file_patterns:
-            match = re.search(pattern, user_input, re.IGNORECASE)
-            if match:
-                potential_name = match.group(1)
-                found_file = self._find_file_in_codebase(potential_name)
-                if found_file:
-                    return found_file
+        if intent_type in intents_for_file_search and search_query:
+            found_file = self._find_file_with_hybrid_search(search_query)
+            if found_file:
+                return found_file
+
+        return None
+
+    def _find_file_with_hybrid_search(self, query: str) -> Optional[str]:
+        """Find a file using hybrid search based on a natural language query."""
+        if not query:
+            return None
+
+        self.console.print(f"[dim]Searching for files related to: '{query}'...[/dim]")
+
+        try:
+            results = self.search.search(query, top=1)
+            if results:
+                top_file, top_score = results[0]
+                self.console.print(f"[dim]Top semantic match: '{top_file}' (score: {top_score:.2f})[/dim]")
+                if top_score > 0.3:  # Confidence threshold
+                    return top_file
+        except Exception as e:
+            # In case of search error, just fail silently and return None
+            pass
         
         return None
     
