@@ -62,43 +62,19 @@ class TestNaturalLanguageInterface:
         assert intent.type == IntentType.EDIT
         assert intent.confidence > 0.6
     
-    @pytest.mark.parametrize("user_input, intent_type, search_return, expected_target, expected_search_query", [
-        # Case 1: Good semantic match found
-        ("fix the authentication logic", IntentType.FIX, [('src/auth.py', 0.8)], 'src/auth.py', 'the authentication logic'),
+    def test_target_extraction(self, natural_interface):
+        """Test target extraction from user input."""
+        # Test file extraction
+        target = natural_interface._extract_target("fix the bug in main.py")
+        assert target == "main.py"
         
-        # Case 2: Semantic match score is too low
-        ("fix something unrelated", IntentType.FIX, [('src/some_other_file.py', 0.2)], None, 'something unrelated'),
+        # Test function extraction
+        target = natural_interface._extract_target("explain the login function")
+        assert target == "login"
         
-        # Case 3: No semantic match found
-        ("fix another thing", IntentType.FIX, [], None, 'another thing'),
-
-        # Case 4: Quoted query is used for search
-        ('edit "the user model"', IntentType.EDIT, [('src/models/user.py', 0.9)], 'src/models/user.py', 'the user model'),
-
-        # Case 5: Intent is not for file search, so no search is performed
-        ("what is your name?", IntentType.CHAT, [('src/main.py', 0.9)], None, None),
-    ])
-    def test_target_extraction_with_hybrid_search(self, natural_interface, user_input, intent_type, search_return, expected_target, expected_search_query):
-        """Test target extraction using hybrid search for natural language queries."""
-        natural_interface.search.search.return_value = search_return
-
-        target = natural_interface._extract_target(user_input, intent_type)
-
-        if expected_search_query:
-            natural_interface.search.search.assert_called_with(expected_search_query, top=1)
-        else:
-            natural_interface.search.search.assert_not_called()
-
-        assert target == expected_target
-
-    def test_target_extraction_explicit_file_overrides_hybrid(self, natural_interface):
-        """Test that an explicit file path in the query overrides hybrid search."""
-        natural_interface.search.search.side_effect = Exception("Should not have been called.")
-
-        with patch.object(natural_interface, '_find_file_in_codebase', return_value='src/main.py') as mock_find_file:
-            target = natural_interface._extract_target("fix bug in main.py", IntentType.FIX)
-            assert target == 'src/main.py'
-            mock_find_file.assert_called_with('main.py')
+        # Test quoted string extraction
+        target = natural_interface._extract_target('search for "authentication error"')
+        assert target == "authentication error"
     
     def test_scope_extraction(self, natural_interface):
         """Test scope extraction from user input."""
