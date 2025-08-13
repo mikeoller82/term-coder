@@ -1,2 +1,2 @@
 [console_scripts]
-tc = term_coder.cli:app
+tc = term_coder.main:main
