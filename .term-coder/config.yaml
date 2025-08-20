@@ -1,13 +1,17 @@
 model:
-  default: gpt-5-mini
+  default: local:ollama
   heavy: gpt-5
-  local: ollama/gpt-oss
+  local: openrouter
 retrieval:
   max_files: 50
   max_tokens: 8000
   hybrid_weight: 0.7
   chunk_size: 1000
   chunk_overlap: 200
+  embedding:
+    backend: hash
+    model: all-MiniLM-L6-v2
+    openai_model: text-embedding-3-small
 safety:
   require_confirmation: true
   create_backups: true
@@ -16,6 +20,10 @@ privacy:
   offline: false
   redact_secrets: true
   log_prompts: false
+sandbox:
+  cpu_seconds: 5
+  memory_mb: 512
+  no_network: false
 git:
   create_branch_on_edit: false
   auto_stage_patches: true

@@ -13,9 +13,9 @@ CONFIG_PATH = CONFIG_DIR / "config.yaml"
 
 DEFAULT_CONFIG: Dict[str, Any] = {
     "model": {
-        "default": "gpt-5-mini",
+        "default": "gpt-5",
         "heavy": "gpt-5",
-        "local": "ollama/gpt-oss"
+        "local": "qwen3-coder:latest"
     },
     "retrieval": {
         "max_files": 50,
@@ -25,7 +25,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "chunk_overlap": 200,
         "embedding": {
             "backend": "hash",  # one of: hash | sentence-transformers | openai
-            "model": "all-MiniLM-L6-v2",  # used when backend != hash
+            "model": "nomic-embed-text:v1.5",  # used when backend != hash
             "openai_model": "text-embedding-3-small",  # optional override for OpenAI backend
         },
     },

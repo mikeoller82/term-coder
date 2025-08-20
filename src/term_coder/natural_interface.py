@@ -102,8 +102,9 @@ class NaturalLanguageInterface:
         self.root_path = Path.cwd()
         
         # Initialize core components
+        default_model = config.get("model.default", "mock-llm") if hasattr(config, 'get') else "mock-llm"
         self.llm = LLMOrchestrator(
-            default_model="local:ollama",
+            default_model=default_model,
             offline=bool(config.get("privacy.offline", False)) if hasattr(config, 'get') else False
         )
         self.search = HybridSearch(self.root_path, config=config)

@@ -56,7 +56,7 @@ def main():
         'run', 'test', 'fix', 'explain', 'review', 'commit', 'pr',
         'generate', 'refactor-rename', 'privacy', 'scan-secrets',
         'audit', 'cleanup', 'diagnostics', 'export-errors', 'tui',
-        'lsp', 'symbols', 'frameworks', 'interactive'
+        'lsp', 'symbols', 'frameworks', 'interactive', 'advanced'
     ]
     
     if args[0] in traditional_commands:
@@ -163,7 +163,7 @@ def load_config_with_init() -> Config:
 def show_help():
     """Show help information."""
     help_text = """
-[bold cyan]Term-Coder: AI Coding Assistant[/bold cyan]
+[bold cyan]Term-Coder: AI Coding Assistant with Claude Code-style Capabilities[/bold cyan]
 
 🚀 [bold]NATURAL LANGUAGE INTERFACE[/bold]
 Just tell term-coder what you want to do in plain English!
@@ -178,9 +178,10 @@ Just tell term-coder what you want to do in plain English!
   tc "review my changes"      # Code review
   tc "run the tests"          # Execute tests
 
-💬 [bold]INTERACTIVE MODE[/bold]
+💬 [bold]INTERACTIVE MODES[/bold]
   tc                          # Start conversational mode
-  tc interactive              # Explicit interactive mode
+  tc interactive              # Natural language interactive mode
+  tc advanced                 # Advanced terminal with proactive editing
 
 🔧 [bold]TRADITIONAL COMMANDS[/bold]
   tc init                     # Initialize configuration
@@ -192,12 +193,30 @@ Just tell term-coder what you want to do in plain English!
   tc review                   # Code review
   tc test                     # Run tests
 
+⚡ [bold]ADVANCED FEATURES[/bold]
+  tc advanced                 # Claude Code-style interface with:
+                              #   • Proactive file editing suggestions
+                              #   • Advanced ripgrep search with context
+                              #   • Interactive project exploration
+                              #   • Syntax highlighting & code completion
+                              #   • Session management & history
+                              #   • Smart context awareness
+
+🔍 [bold]SEARCH CAPABILITIES[/bold]
+  tc search "query"           # Basic search
+  tc advanced → search        # Interactive search with:
+                              #   • hybrid: semantic + lexical
+                              #   • regex: pattern matching  
+                              #   • lexical: text-based only
+                              #   • File type filters (in:py, in:js)
+
 📚 [bold]MORE HELP[/bold]
   tc --help                   # This help
   tc <command> --help         # Command-specific help
   tc diagnostics              # System health check
+  tc advanced → help          # Advanced terminal help
 
-[dim]Just start typing what you want to do - term-coder will understand![/dim]
+[dim]Start with 'tc' for interactive mode or 'tc advanced' for full Claude Code experience![/dim]
     """
     
     console.print(help_text)

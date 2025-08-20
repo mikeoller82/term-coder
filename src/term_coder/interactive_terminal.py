@@ -140,6 +140,10 @@ class InteractiveTerminal:
             await self._handle_context_command(command)
             return True
         
+        elif command.startswith("model"):
+            await self._handle_model_command(command)
+            return True
+        
         return False
     
     async def _display_result(self, result: Dict[str, Any], user_input: str):
@@ -380,6 +384,7 @@ You can speak naturally! Here are some examples:
 - `clear` - Clear the screen
 - `status` - Show session status
 - `context` - Manage context files
+- `model` - Show/change AI model (e.g., `model openai:gpt`)
 
 ## Tips
 
@@ -419,8 +424,8 @@ You can speak naturally! Here are some examples:
         # Conversation length
         status_info.append(f"💬 Conversation: {len(self.conversation_history)} messages")
         
-        # Configuration
-        model = self.config.get("llm.default_model", "unknown")
+        # Configuration  
+        model = self.config.get("model.default", "unknown")
         status_info.append(f"🤖 Model: {model}")
         
         offline = self.config.get("privacy.offline_mode", False)
@@ -445,6 +450,66 @@ You can speak naturally! Here are some examples:
             self.console.print("[green]✅ Context cleared[/green]")
         else:
             self.console.print("[yellow]Available context commands: 'context', 'context clear'[/yellow]")
+    
+    async def _handle_model_command(self, command: str):
+        """Handle model management commands."""
+        from .llm import LLMOrchestrator
+        
+        parts = command.split()
+        if len(parts) == 1:
+            # Show current model
+            current_model = self.config.get("model.default", "mock-llm")
+            self.console.print(f"[cyan]Current model: {current_model}[/cyan]")
+            
+            # Show available models
+            orchestrator = LLMOrchestrator()
+            available_models = list(orchestrator.adapters.keys())
+            self.console.print("\n[bold]Available models:[/bold]")
+            for model in available_models:
+                indicator = " ← current" if model == current_model else ""
+                self.console.print(f"  • {model}{indicator}")
+            
+        elif len(parts) == 2:
+            # Set model
+            new_model = parts[1]
+            orchestrator = LLMOrchestrator()
+            
+            if new_model not in orchestrator.adapters:
+                self.console.print(f"[red]❌ Unknown model: {new_model}[/red]")
+                available_models = list(orchestrator.adapters.keys())
+                self.console.print("[yellow]Available models:[/yellow] " + ", ".join(available_models))
+                return
+            
+            # Update configuration
+            old_model = self.config.get("model.default", "mock-llm")
+            self.config.set("model.default", new_model)
+            self.config.save()
+            
+            # Update natural interface to use new model
+            self.natural_interface.config = self.config
+            # Reinitialize the LLM orchestrator with new model
+            from .llm import LLMOrchestrator
+            default_model = self.config.get("model.default", "mock-llm")
+            self.natural_interface.llm = LLMOrchestrator(
+                default_model=default_model,
+                offline=bool(self.config.get("privacy.offline", False))
+            )
+            
+            self.console.print(f"[green]✅ Model changed from {old_model} to {new_model}[/green]")
+            
+            # Show a helpful tip about the new model
+            model_tips = {
+                "mock-llm": "Mock model for testing - no API calls made",
+                "openai:gpt": "OpenAI GPT-4o-mini - requires OPENAI_API_KEY",
+                "anthropic:claude": "Anthropic Claude Haiku - requires ANTHROPIC_API_KEY", 
+                "local:ollama": "Local Ollama model - requires Ollama running on localhost:11434",
+                "openrouter": "OpenRouter API - requires OPENROUTER_API_KEY"
+            }
+            tip = model_tips.get(new_model, "")
+            if tip:
+                self.console.print(f"[dim]💡 {tip}[/dim]")
+        else:
+            self.console.print("[yellow]Usage: 'model' to show current, 'model <name>' to switch[/yellow]")
     
     def _get_session_context(self) -> Dict[str, Any]:
         """Get current session context."""

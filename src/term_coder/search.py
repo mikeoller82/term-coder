@@ -22,6 +22,54 @@ class LexicalSearch:
     def __init__(self, root: Path):
         self.root = root
         self._rg = shutil.which("rg")
+        
+    def search_patterns(
+        self, 
+        patterns: List[str],
+        include: Optional[Iterable[str]] = None,
+        exclude: Optional[Iterable[str]] = None,
+        case_insensitive: bool = True,
+        context_lines: int = 0,
+        limit: int = 200
+    ) -> List[SearchHit]:
+        """Search for multiple patterns with advanced options."""
+        all_hits = []
+        for pattern in patterns:
+            hits = self.search(
+                pattern, include=include, exclude=exclude, 
+                case_insensitive=case_insensitive, limit=limit//len(patterns)
+            )
+            all_hits.extend(hits)
+        
+        # Remove duplicates and sort by file path and line number
+        seen = set()
+        unique_hits = []
+        for hit in sorted(all_hits, key=lambda x: (x.file_path, x.line_number)):
+            key = (hit.file_path, hit.line_number)
+            if key not in seen:
+                seen.add(key)
+                unique_hits.append(hit)
+        
+        return unique_hits[:limit]
+        
+    def search_with_context(
+        self,
+        query: str,
+        context_before: int = 2,
+        context_after: int = 2,
+        include: Optional[Iterable[str]] = None,
+        exclude: Optional[Iterable[str]] = None,
+        case_insensitive: bool = True,
+        limit: int = 50,
+    ) -> List[dict]:
+        """Search with context lines around matches."""
+        if self._rg:
+            return self._search_with_context_rg(
+                query, context_before, context_after, include, exclude, case_insensitive, limit
+            )
+        return self._search_with_context_python(
+            query, context_before, context_after, include, exclude, case_insensitive, limit
+        )
 
     def search(
         self,
@@ -92,6 +140,129 @@ class LexicalSearch:
             return hits
         except Exception:
             return []
+    
+    def _search_with_context_rg(
+        self,
+        query: str,
+        context_before: int,
+        context_after: int,
+        include: Optional[Iterable[str]],
+        exclude: Optional[Iterable[str]],
+        case_insensitive: bool,
+        limit: int,
+    ) -> List[dict]:
+        """Search with ripgrep providing context."""
+        cmd = [self._rg, "--line-number", "--with-filename", "-n", "-S"]
+        if context_before > 0:
+            cmd.extend(["-B", str(context_before)])
+        if context_after > 0:
+            cmd.extend(["-A", str(context_after)])
+        if case_insensitive:
+            cmd.append("-i")
+        for g in include or []:
+            cmd.extend(["-g", g])
+        for g in exclude or []:
+            cmd.extend(["-g", f"!{g}"])
+        cmd.extend([query, str(self.root)])
+        
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            results = []
+            current_file = None
+            current_match = None
+            
+            for line in proc.stdout.splitlines():
+                if not line.strip():
+                    continue
+                    
+                if line.startswith("--"):  # Separator between matches
+                    if current_match:
+                        results.append(current_match)
+                    current_match = None
+                    continue
+                
+                try:
+                    if ":" in line and not line.startswith(" "):
+                        parts = line.split(":", 2)
+                        if len(parts) >= 3:
+                            file_path, line_no, text = parts
+                            
+                            if current_file != file_path:
+                                current_file = file_path
+                                if current_match:
+                                    results.append(current_match)
+                                current_match = {
+                                    "file": file_path,
+                                    "matches": [],
+                                    "context_before": [],
+                                    "context_after": []
+                                }
+                            
+                            if current_match:
+                                if text.strip():  # Main match line
+                                    current_match["matches"].append({
+                                        "line_number": int(line_no),
+                                        "text": text
+                                    })
+                        
+                except (ValueError, IndexError):
+                    continue
+                    
+                if len(results) >= limit:
+                    break
+            
+            if current_match:
+                results.append(current_match)
+                
+            return results
+            
+        except Exception:
+            return []
+    
+    def _search_with_context_python(
+        self,
+        query: str,
+        context_before: int,
+        context_after: int,
+        include: Optional[Iterable[str]],
+        exclude: Optional[Iterable[str]],
+        case_insensitive: bool,
+        limit: int,
+    ) -> List[dict]:
+        """Python fallback for context search."""
+        needle = query.lower() if case_insensitive else query
+        results = []
+        
+        for path in iter_source_files(self.root, include_globs=include, exclude_globs=exclude):
+            try:
+                lines = path.read_text(errors="ignore").splitlines()
+                matches = []
+                
+                for idx, line in enumerate(lines):
+                    hay = line.lower() if case_insensitive else line
+                    if needle in hay:
+                        start = max(0, idx - context_before)
+                        end = min(len(lines), idx + context_after + 1)
+                        
+                        context_info = {
+                            "file": str(path),
+                            "match_line": idx + 1,
+                            "match_text": line,
+                            "context": lines[start:end],
+                            "context_start": start + 1
+                        }
+                        matches.append(context_info)
+                        
+                        if len(results) >= limit:
+                            return results
+                
+                if matches:
+                    results.extend(matches)
+                    
+            except Exception:
+                continue
+        
+        return results
 
     def _search_python(
         self,

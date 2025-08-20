@@ -30,6 +30,7 @@ from .security import create_privacy_manager
 from .audit import create_audit_logger
 from .language_aware import LanguageAwareContextEngine
 from .framework_commands import FrameworkCommandExtensions
+from .advanced_terminal import start_advanced_terminal
 from .errors import (
     get_error_handler, handle_error, with_error_handling,
     ErrorCategory, ErrorContext, TermCoderError, ErrorSuggestion,
@@ -40,8 +41,12 @@ from .errors import (
 import json
 import sys
 import os
+import asyncio
 from datetime import datetime
 from .recovery import get_recovery_manager
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 console = Console()
@@ -1502,6 +1507,41 @@ def main(
 def _natural_language_fallback(*args):
     """Hidden command to handle natural language input."""
     pass
+
+
+@app.command()
+@with_error_handling(category=ErrorCategory.SYSTEM)
+def advanced(
+    root: Optional[str] = typer.Option(None, "--root", "-r", help="Project root directory")
+) -> None:
+    """Start advanced terminal with Claude Code-style capabilities.
+    
+    Features:
+    - Proactive file editing and suggestions
+    - Advanced ripgrep-based search with context
+    - Interactive project exploration
+    - Natural language command processing
+    - Session management and history
+    """
+    try:
+        cfg = _load_config()
+        project_root = Path(root) if root else Path.cwd()
+        
+        if not project_root.exists():
+            console.print(f"[red]Root directory does not exist: {project_root}[/red]")
+            raise typer.Exit(code=1)
+        
+        console.print("[cyan]🚀 Starting Advanced Terminal Mode...[/cyan]")
+        console.print("[dim]Claude Code-style proactive development interface[/dim]")
+        console.print()
+        
+        asyncio.run(start_advanced_terminal(cfg, project_root))
+        
+    except Exception as e:
+        context = ErrorContext(command="advanced")
+        if not handle_error(e, context):
+            console.print(f"[red]Advanced terminal failed: {e}[/red]")
+            raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

@@ -169,6 +169,107 @@ class LocalOllamaAdapter:
         yield resp.text
 
 
+class OpenRouterAdapter:
+    """OpenRouter adapter with graceful fallback to mock if unavailable."""
+
+    def __init__(self, model_name: str = "openai/gpt-4o-mini"):
+        self.model_name = model_name
+        self._requests = None
+        self._api_key = os.getenv("OPENROUTER_API_KEY")
+        
+        with contextlib.suppress(Exception):
+            import requests  # type: ignore
+            self._requests = requests
+
+    def complete(self, prompt: str, tools: Optional[List[Tool]] = None) -> Response:
+        if self._requests is None or not self._api_key:
+            return Response(text=f"[MOCK:openrouter-disabled] {prompt[:200]}", model=self.model_name)
+        
+        try:
+            headers = {
+                "Authorization": f"Bearer {self._api_key}",
+                "HTTP-Referer": "https://github.com/term-coder/term-coder",
+                "X-Title": "Term Coder",
+                "Content-Type": "application/json"
+            }
+            
+            data = {
+                "model": self.model_name,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            
+            response = self._requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                json=data,
+                headers=headers,
+                timeout=120,
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+                return Response(text=text, model=self.model_name)
+            else:
+                return Response(text=f"[MOCK:openrouter-error-{response.status_code}] {prompt[:200]}", model=self.model_name)
+                
+        except Exception:
+            return Response(text=f"[MOCK:openrouter-error] {prompt[:200]}", model=self.model_name)
+
+    def stream(self, prompt: str, tools: Optional[List[Tool]] = None) -> Iterator[str]:
+        if self._requests is None or not self._api_key:
+            yield f"[MOCK:{self.model_name}] "
+            chunk = prompt.strip()
+            for i in range(0, min(len(chunk), 600), 60):
+                yield chunk[i : i + 60]
+            return
+        
+        try:
+            headers = {
+                "Authorization": f"Bearer {self._api_key}",
+                "HTTP-Referer": "https://github.com/term-coder/term-coder",
+                "X-Title": "Term Coder",
+                "Content-Type": "application/json"
+            }
+            
+            data = {
+                "model": self.model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": True,
+            }
+            
+            response = self._requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                json=data,
+                headers=headers,
+                timeout=120,
+                stream=True,
+            )
+            
+            if response.status_code == 200:
+                for line in response.iter_lines():
+                    if line:
+                        line_str = line.decode('utf-8')
+                        if line_str.startswith('data: '):
+                            line_str = line_str[6:]  # Remove 'data: ' prefix
+                            if line_str == '[DONE]':
+                                break
+                            try:
+                                import json
+                                data = json.loads(line_str)
+                                content = data.get("choices", [{}])[0].get("delta", {}).get("content")
+                                if content:
+                                    yield content
+                            except (json.JSONDecodeError, KeyError):
+                                continue
+            else:
+                yield f"[MOCK:openrouter-stream-error-{response.status_code}] "
+                yield prompt[:120]
+                
+        except Exception:
+            yield f"[MOCK:openrouter-stream-error] "
+            yield prompt[:120]
+
+
 class LLMOrchestrator:
     def __init__(self, default_model: str = "mock-llm", offline: bool | None = None, privacy_manager=None, audit_logger=None):
         self.adapters: Dict[str, BaseLLMAdapter] = {
@@ -176,6 +277,7 @@ class LLMOrchestrator:
             "openai:gpt": OpenAIAdapter("gpt-4o-mini"),
             "anthropic:claude": AnthropicAdapter("claude-3-haiku-20240307"),
             "local:ollama": LocalOllamaAdapter("qwen3-coder:latest"),
+            "openrouter": OpenRouterAdapter("openai/gpt-4o-mini"),
         }
         self.default_model = default_model if default_model in self.adapters else "mock-llm"
         self.offline = offline
@@ -184,7 +286,7 @@ class LLMOrchestrator:
 
     def get(self, model: Optional[str]) -> BaseLLMAdapter:
         key = model or self.default_model
-        if self.offline and key in {"openai:gpt", "anthropic:claude"}:
+        if self.offline and key in {"openai:gpt", "anthropic:claude", "openrouter"}:
             return self.adapters["local:ollama"] if "local:ollama" in self.adapters else self.adapters["mock-llm"]
         return self.adapters.get(key, self.adapters[self.default_model])
 
