@@ -24,6 +24,9 @@ from .config import Config, ensure_initialized
 from .natural_interface import NaturalLanguageInterface
 from .interactive_terminal import start_interactive_mode
 from .errors import handle_error, ErrorContext
+from dotenv import load_dotenv   
+
+load_dotenv()  # Load environment variables from .env file                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
 
 
 console = Console()

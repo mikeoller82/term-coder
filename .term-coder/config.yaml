@@ -1,5 +1,5 @@
 model:
-  default: local:ollama
+  default: openai:gpt
   heavy: gpt-5
   local: openrouter
 retrieval:
